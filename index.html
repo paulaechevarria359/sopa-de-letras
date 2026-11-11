@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sopa de letras – Picardía</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:22px 14px;font-family:Arial,sans-serif;background:#f5f1e8;color:#28251f}
+main{max-width:760px;margin:auto;background:#fffdf8;padding:22px;border-radius:18px;box-shadow:0 5px 24px #0001}
+h1{text-align:center;margin:0 0 8px;font-size:27px}p{text-align:center;color:#665f53;line-height:1.5}
+.stats{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:18px 0 10px;font-weight:bold}
+.progress{height:9px;background:#e9e1d2;border-radius:10px;overflow:hidden}.bar{height:100%;width:0;background:#58956b;transition:.2s}
+.board{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:3px;max-width:600px;margin:20px auto}
+.cell{aspect-ratio:1;border:1px solid #ded6c8;border-radius:5px;background:#fff;font-weight:bold;font-size:clamp(10px,2.5vw,16px);padding:0;cursor:pointer;color:#28251f;touch-action:manipulation}
+.cell.selected{background:#f5c45b;border-color:#d59b27}.cell.found{background:#91cda3;color:#17452a;border-color:#65ad7b}
+.words{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:600px;margin:12px auto}
+.word{padding:9px;border:1px solid #ded6c8;border-radius:8px;text-align:center;font-size:13px}.word.done{text-decoration:line-through;opacity:.48;background:#e7f3e9}
+#message{text-align:center;min-height:24px;font-weight:bold;color:#496b50}
+button.action{display:block;margin:14px auto;padding:11px 18px;border:0;border-radius:9px;background:#426d51;color:white;font-weight:bold;font-size:15px;cursor:pointer}
+#win{display:none;text-align:center;background:#e7f3e9;border-radius:12px;padding:15px;margin-top:15px}
+@media(min-width:560px){.words{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<main>
+<h1>🔎 Sopa de letras: Picardía</h1>
+<p><b>La vuelta de Martín Fierro · Cantos XXI al XXIV</b><br>Encontrá las 16 palabras escondidas. Pueden estar en horizontal, vertical o diagonal.</p>
+<div class="stats"><span>Palabras encontradas</span><span id="count">0 / 16</span></div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div class="board" id="board" aria-label="Tablero de sopa de letras"></div>
+<div id="message" aria-live="polite">Tocá la primera y la última letra de una palabra.</div>
+<div style="font-weight:bold;margin-top:20px">Palabras para encontrar</div>
+<div class="words" id="words"></div>
+<div id="win"><h2>🎉 ¡Felicitaciones!</h2><p>Encontraste todas las palabras. ¡Excelente repaso!</p></div>
+<button class="action" id="restart">Jugar otra vez</button>
+</main>
+<script>
+(()=>{
+const list=['PICARDIA','DESAMPARO','OVEJAS','APUESTAS','TRUCO','NAIPES','TABA','BILLAR','NAPOLITANO','OFICIAL','ELECCIONES','LIBERTAD','CRUZ','GAUCHO','INJUSTICIAS','GUARDIA'];
+const N=16,dirs=[[0,1],[1,0],[1,1],[1,-1],[-1,0],[0,-1],[-1,-1],[-1,1]];
+let grid,places,found,first;
+const $=id=>document.getElementById(id);
+function build(){
+grid=Array.from({length:N},()=>Array(N).fill(''));places={};found=new Set();first=null;
+[...list].sort((a,b)=>b.length-a.length).forEach(w=>{
+let opts=[];
+for(let r=0;r<N;r++)for(let c=0;c<N;c++)for(let [dr,dc] of dirs){
+let er=r+(w.length-1)*dr,ec=c+(w.length-1)*dc;if(er<0||er>=N||ec<0||ec>=N)continue;
+let ok=true;for(let k=0;k<w.length;k++)if(grid[r+k*dr][c+k*dc]&&grid[r+k*dr][c+k*dc]!==w[k])ok=false;
+if(ok)opts.push({r,c,dr,dc});
+}
+let p=opts[Math.floor(Math.random()*opts.length)];places[w]=[];
+for(let k=0;k<w.length;k++){let rr=p.r+k*p.dr,cc=p.c+k*p.dc;grid[rr][cc]=w[k];places[w].push(rr*N+cc)}
+});
+const letters='ABCDEFGHIJKLMNÑOPQRSTUVWXYZ';
+for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!grid[r][c])grid[r][c]=letters[Math.floor(Math.random()*letters.length)];
+render();
+}
+function render(){
+$('board').innerHTML='';
+grid.forEach((row,r)=>row.forEach((ch,c)=>{
+let b=document.createElement('button');b.className='cell';b.textContent=ch;b.dataset.pos=r*N+c;b.setAttribute('aria-label',ch);b.addEventListener('click',()=>pick(r*N+c));$('board').appendChild(b);
+}));
+$('words').innerHTML='';
+list.forEach(w=>{let d=document.createElement('div');d.className='word';d.id='w-'+w;d.textContent=w;$('words').appendChild(d)});
+update();
+}
+function pick(pos){
+if(first===null){first=pos;$('message').textContent='Ahora tocá la última letra.';paint();return}
+let a=first,b=pos;first=null;let ar=Math.floor(a/N),ac=a%N,br=Math.floor(b/N),bc=b%N,dr=br-ar,dc=bc-ac;
+if(!(dr===0||dc===0||Math.abs(dr)===Math.abs(dc))){$('message').textContent='Elegí una línea recta.';paint();return}
+let len=Math.max(Math.abs(dr),Math.abs(dc))+1,sr=Math.sign(dr),sc=Math.sign(dc),seq=[];
+for(let k=0;k<len;k++)seq.push((ar+k*sr)*N+ac+k*sc);
+let s=seq.map(i=>grid[Math.floor(i/N)][i%N]).join(''),rev=s.split('').reverse().join('');
+let w=list.find(x=>(x===s||x===rev)&&!found.has(x));
+if(w){found.add(w);$('message').textContent='¡Encontraste '+w+'!'}else $('message').textContent='No coincide con una palabra pendiente. ¡Probá otra vez!';
+paint();update();
+}
+function paint(){
+document.querySelectorAll('.cell').forEach(b=>{let p=+b.dataset.pos;b.classList.toggle('found',list.some(w=>found.has(w)&&places[w].includes(p)));b.classList.toggle('selected',p===first)});
+}
+function update(){
+$('count').textContent=found.size+' / '+list.length;$('bar').style.width=(found.size/list.length*100)+'%';
+list.forEach(w=>{let d=$('w-'+w);if(d)d.classList.toggle('done',found.has(w))});
+$('win').style.display=found.size===list.length?'block':'none';
+}
+$('restart').addEventListener('click',build);build();
+})();
+</script>
+</body>
+</html>
